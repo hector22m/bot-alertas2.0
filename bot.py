@@ -1,41 +1,23 @@
-import json
+import time
 import requests
+from bot import handle
 
 TOKEN = "TU_BOT_TOKEN"
 API = f"https://api.telegram.org/bot{TOKEN}"
 
-def send(chat_id, msg):
-    requests.post(
-        f"{API}/sendMessage",
-        data={"chat_id": chat_id, "text": msg}
-    )
+offset = 0
 
-def load():
-    with open("data.json") as f:
-        return json.load(f)
+while True:
+    r = requests.get(
+        f"{API}/getUpdates",
+        params={"offset": offset, "timeout": 60}
+    ).json()
 
-def save(data):
-    with open("data.json", "w") as f:
-        json.dump(data, f, indent=2)
+    for u in r.get("result", []):
+        offset = u["update_id"] + 1
+        chat_id = u["message"]["chat"]["id"]
+        text = u["message"]["text"]
+        handle(chat_id, text)
 
-def handle(chat_id, text):
-    data = load()
+    time.sleep(1)
 
-    if text.startswith("/add"):
-        try:
-            _, keyword, price = text.split()
-            data["searches"].append({
-                "keyword": keyword,
-                "price": int(price),
-                "last_id": None
-            })
-            save(data)
-            send(chat_id, "✅ Búsqueda añadida")
-        except:
-            send(chat_id, "❌ Uso: /add palabra precio")
-
-    elif text == "/list":
-        msg = "📋 Búsquedas:\n"
-        for i, s in enumerate(data["searches"]):
-            msg += f"{i+1}. {s['keyword']} ≤ {s['price']}€\n"
-        send(chat_id, msg)
